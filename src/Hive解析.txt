@@ -1,0 +1,48 @@
+Join实现原理：
+	SQL:
+		select u.name,o.orderId from order o 
+		join user u 
+		on u.userId = o.userId
+	实现原理:在map的输出value中为不同表的数据打上tag标记，在reduce阶段根据tag判断数据来源
+		user表				Map之后					shuffle&sort之后			reduce之后
+		------------------------------------------------------------------------------------------------------
+		userId	name				key	value					1	<1,hongxingfan>			name		orderId
+		1		hongxingfan			1	<1,hongxingfan>			1	<2,1001>				hongxingfan		1001
+		2		wenxiubi			2	<1,wenxiubi>			1	<2,1002>				hongxingfan		1002
+		3		huanhuanli			3	<1,huanhuanli>
+		order表
+		userId	orderId				key	value
+		1		1001				1	<2,1001>				2	<1,wenxiubi>			wenxiubi		1002
+		1		1002				1	<2,1002>				2	<2,1002>
+		2		1002				2	<2,1002>
+		3		1004				3	<2,1004>				3	<1,huanhuanli>			huanhuanli		1004
+																3	<2,1004>
+Group By实现原理：
+	SQL：
+		select addr,age,count(1) from student group by addr,age
+	实现原理：
+		student表	map之后				shuffle&sort之后	reduce
+		-----------------------------------------------------------------
+		addr	age		key		value			<bj,20>	2		<bj,20>	3
+		bj		20		<bj,20>		2			<bj,20>	1		<sh,23>	1
+		sh		23		<sh,23>		1			<sh,23>	1
+		bj		20		
+		
+		gz		21		<gz,21>		1			<gz,21>	1		<gz,21>	1
+		bj		20		<bj,20>		1
+
+Distinct的实现原理：这里是其中一种方法
+	SQL：
+		select addr,count(distinct age) from student
+	实现原理：深入理解partition的过程
+		student表	map之后						shuffle&sort之后		reduce之后
+		-----------------------------------------------------------------------------------
+		addr	age		key		value	partitionKey		key		value		key		value
+		bj		20		<bj,20>	1		bj					<bj,20>	1			bj		2
+		bj		21		<bj,21>	1		bj					<bj,21>	1
+		sh		22		<sh,22>	1		sh					<gz,1>	1			gz		1							
+		gz		28		<gz,28>	1		gz					<sh,22>	1			sh		1
+		gz		28		<gz,28>	1		gz					<gz,28>	1			gz		1
+参考：
+	http://blog.csdn.net/nacey5201/article/details/34215497
+	http://yychao.iteye.com/blog/1749562

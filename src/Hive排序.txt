@@ -1,0 +1,33 @@
+order by：
+		会对输入做全局排序，因此只有一个reducer（多个reducer无法保证全局有序）
+		只有一个reducer，会导致当输入规模较大时，需要较长的计算时间。
+		set hive.mapred.mode=nonstrict; (default value / 默认值)
+		set hive.mapred.mode=strict;
+		order by 和数据库中的Order by 功能一致，按照某一项或几项 排序输出。
+		与数据库中 order by 的区别在于在hive.mapred.mode = strict 模式下 必须指定 limit 否则执行会报错。
+		hive> select * from test order by id;
+		FAILED: Error in semantic analysis: 1:28 In strict mode, if ORDER BY is specified, LIMIT
+				must also be specified. Error encountered near token 'id'
+		原因： 在order by 状态下所有数据会到一台服务器进行reduce操作也即只有一个reduce，如果在数据量大
+			   的情况下会出现无法输出结果的情况，如果进行 limit n ，那只有 n * map number 条记录而已。
+			   只有一个reduce也可以处理过来。
+sort by：
+		不是全局排序，其在数据进入reducer前完成排序.
+		因此：如果用sort by进行排序，并且设置mapred.reduce.tasks>1， 则sort by只保证每个reducer的输出
+			  有序，不保证全局有序。
+		sort by 不受 hive.mapred.mode 是否为strict ,nostrict 的影响
+		sort by 的数据只能保证在同一reduce中的数据可以按指定字段排序。
+		使用sort by 你可以指定执行的reduce 个数 （set mapred.reduce.tasks=<number>）,对输出的数据再执行归并排序，
+		即可以得到全部结果。
+		注意：可以用limit子句大大减少数据量。使用limit n后，传输到reduce端（单机）的数据记录数就减少到n* （map个数）。
+		否则由于数据过大可能出不了结果。
+distribute by：
+		按照指定的字段对数据进行划分到不同的输出reduce / 文件中。
+		insert overwrite local directory '/home/hadoop/out' select * from test order by name distribute by length(name);
+		此方法会根据name的长度划分到不同的reduce中，最终输出到不同的文件中。
+		length 是内建函数，也可以指定其他的函数或这使用自定义函数。
+		cluster by 除了具有 distribute by 的功能外还兼具 sort by 的功能。
+		但是排序只能是倒序排序，不能指定排序规则为asc 或者desc。 
+
+配合python的udf/udaf使用：
+		

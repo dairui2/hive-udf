@@ -1,0 +1,79 @@
+产生倾斜的原因：
+	1.sql操作产生的倾斜：
+		1.1：join一个小表，但key值过于单一，发送到一个或几个reducer的值明显高于其他reducer
+			 join两个大表，产生的空值太多，空值都由摸个reducer处理，造成这个reducer非常慢
+		1.2：group by的维度过小，某些值过多，发到某个reducer的数据量太大
+		1.3：count distinct某特殊值过多，这些特殊值会发到摸个reducer去处理
+	2.数据本身产生倾斜
+		2.1：数据本身的key值分布不均匀
+		2.2：业务本身对数据的处理产生倾斜（与sql操作相关）
+		2.3：建表时考虑不周到
+表现：
+	1.任务进度长时间维持在99%左右，在web页面观察只有少数reducer没有完成，同时某个reducer处理的数据量明显高于
+	  其他的reducer
+
+数据倾斜的解决方案：
+	1.参数调节：
+		1.1：hive.map.aggr = true;在map端聚合，相当于Combiner
+		1.2：hive.groupby.skewindata = true;有数据倾斜时进行负载均衡，生成的查询会生成2个MR，第一个MR将数据
+		     均匀的分布到reducer中，达到负载均衡的目的，进行部分聚合（相同key可能落入不同的reducer），第二个MR，
+			 在根据group key分发到不同的reducer中，最后达到最终的聚合目的
+	2.sql语句调节
+		2.1：如何join
+			 驱动表的选择，选取key分布最均匀的表作为驱动表，做好列裁剪和filter操作，已达到两个表join时，
+			 数据量相对变小的效果
+		2.2：一个大表一个小表join
+			 将小表装载到map内存中(map join)，在map端完成reduce操作，m小表大约在几千条左右
+		2.3：大表与大表join：
+			 这样的操作可能产生大量的null值，null会又一个reduce处理，这时需要把空值的key变成一个字符串加上
+			 一个随机数，把倾斜的数据分到不同的reduce中，不影响数据结果
+		2.4：count distinct？
+			 
+		2.5：group by
+			 采用sum() group by的方式替代count(distinct)
+		2.6：特殊情况特殊处理：
+			 在业务逻辑优化效果的不大情况下，可以将倾斜的数据单独拿出来处理，最后union回去
+
+典型的业务场景：
+	1.空值产生的数据倾斜
+	  场景：如日志中，常会有信息丢失的问题，比如日志中的user_id，如果用user_id与用户数据表关联，会出现数据倾斜
+	  解决1：user_id为空的不参与关联
+			select * from autolog a 
+			join users u
+			on a.user_id is not null
+			and a.user_id = u.userId
+			union all
+			select * from log a where a.user_id is null
+		解决2：给空值分配新的key
+			 select * from autolog a 
+			 left outer join users u
+			 on case when a.user_id is null then concat("hive", rand()) else
+			 a.user_id end = u.userId
+		结论：
+			方法2比方法1效率更好，不但io少了，而且作业数量也少了，方法2的job数是1，方法1的job数是2，这是和解决
+			无效key的情况
+	2.不同数据类型关联产生数据倾斜
+	  场景：用户表user中的userId是int类型的，autolog表中的数据有int也有string类型的，当按照user_id进行join时，
+			默认的hash操作会按照int型的id进行分配，导致所有string类型id的记录分配到一个reduce上(类型不同，直接输出)
+	  解决：将数字类型转化成字符串类型
+	        select * from users u 
+			left outer join autolog a
+			on u.userId = cast(a.user_id as string)
+	3.小表也不小怎么用mapjoin
+	  场景：users表中有1000w数据，量也不小，将user分发到map上也是不小的开销，普通的join又会碰到数据倾斜的问题
+	  解决：在autolog中抽取出独立的user_id与users表关联(user_id的多少要根据业务情况)，再将关联后的结果mapjoin
+			select /*+mapjoin(x)*/* from autolog a
+			left outer join(
+				select /*+mapjoin(c)*/d.* from (
+					select distinct user_id from autolog		
+				)c join users d on c.user_id = d.userId
+			)x on a.user_id = x.userId
+	4.通用一招(mapreduce)
+	  4.1：采样autolog表，获取倾斜的key，生成一张tmp1表
+	  4.2：将tmp表和users表做关联，产生tmp2表，获取更多用户信息，把tmp2读到distribute cache中
+	  4.3：map操作读取autolog和users表，假定记录来自autolog表，则检查user_id是否在tmp2中，如果是则将这条记录
+		   输出本地a中，其他的生成key value继续操作
+	  4.4：最后把a文件和步奏3中的结果合并到hdfs上
+参考：
+	http://www.cnblogs.com/ggjucheng/archive/2013/01/03/2842860.html
+	http://sznmail.iteye.com/blog/1499789
