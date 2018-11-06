@@ -74,6 +74,4 @@
 	  4.3：map操作读取autolog和users表，假定记录来自autolog表，则检查user_id是否在tmp2中，如果是则将这条记录
 		   输出本地a中，其他的生成key value继续操作
 	  4.4：最后把a文件和步奏3中的结果合并到hdfs上
-参考：
-	http://www.cnblogs.com/ggjucheng/archive/2013/01/03/2842860.html
-	http://sznmail.iteye.com/blog/1499789
+

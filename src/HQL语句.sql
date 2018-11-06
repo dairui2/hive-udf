@@ -1,7 +1,3 @@
--- 参考：
-    -- http://blog.csdn.net/hguisu/article/details/7256833 
-    -- http://www.cnblogs.com/tangtianfly/archive/2012/03/13/2393449.html
-    -- http://bupt04406.iteye.com/blog/1097437
 
 -- create语句,创建内部表
     create table autolog_1(time int,ip string,addr string,suv string,domain string,url string) 

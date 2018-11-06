@@ -43,6 +43,4 @@ Distinct的实现原理：这里是其中一种方法
 		sh		22		<sh,22>	1		sh					<gz,1>	1			gz		1							
 		gz		28		<gz,28>	1		gz					<sh,22>	1			sh		1
 		gz		28		<gz,28>	1		gz					<gz,28>	1			gz		1
-参考：
-	http://blog.csdn.net/nacey5201/article/details/34215497
-	http://yychao.iteye.com/blog/1749562
+
