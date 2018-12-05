@@ -6,11 +6,15 @@ import org.apache.hadoop.hive.ql.exec.UDF;
 // 创建临时函数：hive>create temporary function udf as 'udf.UDF_1';
 // 使用UDF：hive>select udf(name) from student;  
 public class UDF_1 extends UDF {
-	public String evaluate() {
+	public static String evaluate() {
 		return "hello world!";
 	}
 
 	public String evaluate(String str) {
-		return "hello world: " + str;
+		return "hello " + str;
+	}
+	public static void main(String[] args) {
+		UDF_1 u1	= new UDF_1();
+		System.out.println(u1.evaluate("dai"));
 	}
 }
