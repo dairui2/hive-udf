@@ -9,7 +9,7 @@ import java.sql.Statement;
 public class DDL {
 
 	private static final String driver = "org.apache.hadoop.hive.jdbc.HiveDriver";
-	private static final String url = "jdbc:hive://xp-51:10000/log";
+	private static final String url = "jdbc:hive://localhost:10000/log";
 	private static final String uname = "";
 	private static final String passwd = "";
 
